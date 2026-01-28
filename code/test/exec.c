@@ -8,10 +8,19 @@
 
 int main() {
     int pid;
-    pid = Exec("num_io");
+    int i,j;
+    PrintString ("In parent ..\n");
+    pid = Exec("../test/add");
     if (pid < 0) {
         Write("Exec failed: ", 14, stdout);
         PrintNum(pid);
-    } else
-        Join(pid);
+    } 
+    else{
+	    for(i =0 ;i<1000;i++){
+		    for(j=0;j<20000;j++){
+			    PrintString("In parent \n");
+		    }
+	    }
+    }
+    Join(pid);
 }

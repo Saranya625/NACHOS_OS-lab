@@ -128,12 +128,14 @@ class Thread {
     // -- one for its state while executing user code, one for its state while
     // executing kernel code.
 
-    int userRegisters[NumTotalRegs];  // user-level CPU register state
+    int userRegisters[NumTotalRegs];  // user-level CPU registers
+int priority ;
 
    public:
     void SaveUserState();     // save user-level register state
     void RestoreUserState();  // restore user-level register state
-
+    int GetPriority();
+    void SetPriority(int n);
     AddrSpace *space;  // User code this thread is running.
 };
 

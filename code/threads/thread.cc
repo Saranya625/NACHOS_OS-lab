@@ -39,6 +39,8 @@ Thread::Thread(char *threadName, bool _has_dynamic_name /*=false*/) {
     stackTop = NULL;
     stack = NULL;
     status = JUST_CREATED;
+    priority = 1;
+
     for (int i = 0; i < MachineStateSize; i++) {
         machineState[i] = NULL;  // not strictly necessary, since
                                  // new thread ignores contents
@@ -148,6 +150,14 @@ void Thread::Begin() {
     kernel->interrupt->Enable();
 }
 
+void Thread::SetPriority(int p) {
+    priority = p;
+}
+
+int Thread::GetPriority() {
+    return priority;
+}
+
 //----------------------------------------------------------------------
 // Thread::Finish
 // 	Called by ThreadRoot when a thread is done executing the
@@ -255,6 +265,11 @@ void Thread::Sleep(bool finishing) {
 static void ThreadFinish() { kernel->currentThread->Finish(); }
 static void ThreadBegin() { kernel->currentThread->Begin(); }
 void ThreadPrint(Thread *t) { t->Print(); }
+
+
+
+
+
 
 #ifdef PARISC
 

@@ -45,7 +45,7 @@
 #include "filesys.h"
 #include "openfile.h"
 #include "sysdep.h"
-
+#include "thread_test.h"
 // global variables
 Kernel *kernel;
 Debug *debug;
@@ -261,6 +261,11 @@ int main(int argc, char **argv) {
         Print(printFileName);
     }
 #endif  // FILESYS_STUB
+
+    ThreadTestNew();
+    while(true){
+	    kernel->currentThread->Yield();
+    }
 
     // finally, run an initial user program if requested to do so
     if (userProgName != NULL) {

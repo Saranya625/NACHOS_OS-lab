@@ -9,6 +9,7 @@
 #include "copyright.h"
 #include "debug.h"
 #include "bitmap.h"
+#include <errno.h>
 
 //----------------------------------------------------------------------
 // BitMap::BitMap

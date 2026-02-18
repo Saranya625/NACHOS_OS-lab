@@ -22,6 +22,14 @@
 #include "callback.h"
 #include "timer.h"
 
+
+class SleepThread {
+  public:
+    Thread *thread;
+    int wakeTime;
+    SleepThread(Thread *t, int wt) : thread(t), wakeTime(wt) {}
+};
+
 // The following class defines a software alarm clock.
 class Alarm : public CallBackObj {
    public:

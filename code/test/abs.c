@@ -5,7 +5,9 @@
 int main() {
     int x, y;
     x = -123;
+    PrintNum(x);
     y = Abs(x);
+    PrintNum(y);
     Halt();
 }
 

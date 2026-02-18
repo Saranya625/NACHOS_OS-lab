@@ -48,9 +48,11 @@
 #define SC_Wait 52
 #define SC_Signal 53
 #define SC_GetPid 54
+
 #define SC_Abs 55  
-#ifndef IN_ASM
 #define SC_Sleep 56
+#ifndef IN_ASM
+
 /* The system call interface.  These are the operations the Nachos
  * kernel needs to support, to be able to run user programs.
  *

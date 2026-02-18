@@ -65,11 +65,11 @@ Abs:
         syscall
         j       $31
         .end Abs
-
-.globl Sleep
-    .ent    Sleep
+	
+	.globl Sleep
+	.ent    Sleep
 Sleep:
-    addiu $2, $0, SC_Sleep
+     addiu $2, $0, SC_Sleep
     syscall
     j $31
     .end Sleep

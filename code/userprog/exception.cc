@@ -494,6 +494,17 @@ void ExceptionHandler(ExceptionType which) {
                 case SC_ThreadExit:
                 case SC_ThreadJoin:
                     return handle_not_implemented_SC(type);
+		case SC_Sleep: {
+				       int ticks = kernel->machine->ReadRegister(4);
+				       if (ticks > 0) {
+					       kernel->alarm->WaitUntil(ticks);
+				       }
+    // Advance PC
+    kernel->machine->WriteRegister(PrevPCReg, kernel->machine->ReadRegister(PCReg));
+    kernel->machine->WriteRegister(PCReg,     kernel->machine->ReadRegister(NextPCReg));
+    kernel->machine->WriteRegister(NextPCReg, kernel->machine->ReadRegister(NextPCReg) + 4);
+    return;
+}
 
                 default:
                     cerr << "Unexpected system call " << type << "\n";

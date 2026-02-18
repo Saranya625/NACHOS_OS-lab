@@ -86,7 +86,7 @@ class Thread {
                                              // NOTE -- thread being deleted
                                              // must not be running when delete
                                              // is called
-
+    int wakeTime;
     int processID;
     int parrentID;
     int exitStatus;

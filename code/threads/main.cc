@@ -262,10 +262,7 @@ int main(int argc, char **argv) {
     }
 #endif  // FILESYS_STUB
 
-    ThreadTestNew();
-    while(true){
-	    kernel->currentThread->Yield();
-    }
+   
 
     // finally, run an initial user program if requested to do so
     if (userProgName != NULL) {
@@ -275,6 +272,11 @@ int main(int argc, char **argv) {
         space->Execute();    // run the program
         ASSERTNOTREACHED();  // Execute never returns
     }
+	
+    ThreadTestNew();
+     while(true){
+             kernel->currentThread->Yield();
+      }
 
     // If we don't run a user program, we may get here.
     // Calling "return" would terminate the program.

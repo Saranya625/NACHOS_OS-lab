@@ -51,6 +51,8 @@
 
 #define SC_Abs 55  
 #define SC_Sleep 56
+#define SC_SetStdIn 57
+#define SC_SetStdOut 58
 #ifndef IN_ASM
 
 /* The system call interface.  These are the operations the Nachos
@@ -185,6 +187,13 @@ int CreateSemaphore(char *name, int semval);
 int Wait(char *name);
 
 int Signal(char *name);
+
+/* Redirect stdin/stdout of current process to file path.
+ * Pass empty string "" to restore console input/output.
+ * Return 0 on success, -1 on failure.
+ */
+int SetStdIn(char *filePath);
+int SetStdOut(char *filePath);
 
 /* User-level thread operations: Fork and Yield.  To allow multiple
  * threads to run within a user program.

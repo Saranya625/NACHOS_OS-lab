@@ -55,6 +55,9 @@ int PTable::ExecUpdate(char* name) {
     pcb[index] = new PCB(index);
     pcb[index]->SetFileName(name);
     kernel->fileSystem->Renew(index);
+#ifdef FILESYS_STUB
+    kernel->fileSystem->InheritStdIO(index, kernel->currentThread->processID);
+#endif
 
     // parrentID là processID của currentThread
     pcb[index]->parentID = kernel->currentThread->processID;

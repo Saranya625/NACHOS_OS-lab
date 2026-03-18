@@ -22,8 +22,41 @@ int SysAdd(int op1, int op2) { return op1 + op2; }
 
 int SysAbs(int op1) {if(op1>0) return op1; else return -op1;}
 
+int SysRead(char* buffer, int charCount, int fileId);
+int SysWrite(char* buffer, int charCount, int fileId);
+
+char ReadStdInChar() {
+    char c = 0;
+    int bytes = SysRead(&c, 1, 0);
+    if (bytes <= 0) return EOF;
+    return c;
+}
+
+void WriteStdOutChar(char c) { SysWrite(&c, 1, 1); }
+
 int SysReadNum() {
-    readUntilBlank();
+    memset(_numberBuffer, 0, sizeof(_numberBuffer));
+    char c = ReadStdInChar();
+
+    if (c == EOF) {
+        DEBUG(dbgSys, "Unexpected end of file - number expected");
+        return 0;
+    }
+
+    if (isBlank(c)) {
+        DEBUG(dbgSys, "Unexpected white-space - number expected");
+        return 0;
+    }
+
+    int n = 0;
+    while (!(isBlank(c) || c == EOF)) {
+        _numberBuffer[n++] = c;
+        if (n > MAX_NUM_LENGTH) {
+            DEBUG(dbgSys, "Number is too long");
+            return 0;
+        }
+        c = ReadStdInChar();
+    }
 
     int len = strlen(_numberBuffer);
     // Read nothing -> return 0
@@ -89,17 +122,16 @@ int SysReadNum() {
 }
 
 void SysPrintNum(int num) {
-    if (num == 0) return kernel->synchConsoleOut->PutChar('0');
+    if (num == 0) return WriteStdOutChar('0');
 
     if (num == INT32_MIN) {
-        kernel->synchConsoleOut->PutChar('-');
-        for (int i = 0; i < 10; ++i)
-            kernel->synchConsoleOut->PutChar("2147483648"[i]);
+        WriteStdOutChar('-');
+        for (int i = 0; i < 10; ++i) WriteStdOutChar("2147483648"[i]);
         return;
     }
 
     if (num < 0) {
-        kernel->synchConsoleOut->PutChar('-');
+        WriteStdOutChar('-');
         num = -num;
     }
     int n = 0;
@@ -107,15 +139,12 @@ void SysPrintNum(int num) {
         _numberBuffer[n++] = num % 10;
         num /= 10;
     }
-    for (int i = n - 1; i >= 0; --i)
-        kernel->synchConsoleOut->PutChar(_numberBuffer[i] + '0');
+    for (int i = n - 1; i >= 0; --i) WriteStdOutChar(_numberBuffer[i] + '0');
 }
 
-char SysReadChar() { return kernel->synchConsoleIn->GetChar(); }
+char SysReadChar() { return ReadStdInChar(); }
 
-void SysPrintChar(char character) {
-    kernel->synchConsoleOut->PutChar(character);
-}
+void SysPrintChar(char character) { WriteStdOutChar(character); }
 
 int SysRandomNum() { return random(); }
 
@@ -130,7 +159,7 @@ char* SysReadString(int length) {
 
 void SysPrintString(char* buffer, int length) {
     for (int i = 0; i < length; i++) {
-        kernel->synchConsoleOut->PutChar(buffer[i]);
+        WriteStdOutChar(buffer[i]);
     }
 }
 
@@ -172,6 +201,8 @@ int SysClose(int id) { return kernel->fileSystem->Close(id); }
 
 int SysRead(char* buffer, int charCount, int fileId) {
     if (fileId == 0) {
+        int redirected = kernel->fileSystem->ReadStdIn(buffer, charCount);
+        if (redirected >= 0) return redirected;
         return kernel->synchConsoleIn->GetString(buffer, charCount);
     }
     return kernel->fileSystem->Read(buffer, charCount, fileId);
@@ -179,6 +210,8 @@ int SysRead(char* buffer, int charCount, int fileId) {
 
 int SysWrite(char* buffer, int charCount, int fileId) {
     if (fileId == 1) {
+        int redirected = kernel->fileSystem->WriteStdOut(buffer, charCount);
+        if (redirected >= 0) return redirected;
         return kernel->synchConsoleOut->PutString(buffer, charCount);
     }
     return kernel->fileSystem->Write(buffer, charCount, fileId);
@@ -247,5 +280,11 @@ int SysSignal(char* name) {
 }
 
 int SysGetPid() { return kernel->currentThread->processID; }
+
+int SysSetStdIn(char* fileName) { return kernel->fileSystem->SetStdIn(fileName); }
+
+int SysSetStdOut(char* fileName) {
+    return kernel->fileSystem->SetStdOut(fileName);
+}
 
 #endif /* ! __USERPROG_KSYSCALL_H__ */

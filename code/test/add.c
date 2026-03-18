@@ -9,8 +9,7 @@
 
 int main() {
     int result;
-    result = Add(2,3);
+    result = Add(-2,-7);
     PrintNum(result);
-    Halt();
-    /* not reached */
+    return 0;
 }

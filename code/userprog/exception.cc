@@ -410,6 +410,22 @@ void handle_SC_GetPid() {
     return move_program_counter();
 }
 
+void handle_SC_SetStdIn() {
+    int virtAddr = kernel->machine->ReadRegister(4);
+    char* filePath = stringUser2System(virtAddr);
+    kernel->machine->WriteRegister(2, SysSetStdIn(filePath));
+    delete[] filePath;
+    return move_program_counter();
+}
+
+void handle_SC_SetStdOut() {
+    int virtAddr = kernel->machine->ReadRegister(4);
+    char* filePath = stringUser2System(virtAddr);
+    kernel->machine->WriteRegister(2, SysSetStdOut(filePath));
+    delete[] filePath;
+    return move_program_counter();
+}
+
 void ExceptionHandler(ExceptionType which) {
     int type = kernel->machine->ReadRegister(2);
 
@@ -477,6 +493,10 @@ void ExceptionHandler(ExceptionType which) {
                     return handle_SC_Signal();
                 case SC_GetPid:
                     return handle_SC_GetPid();
+                case SC_SetStdIn:
+                    return handle_SC_SetStdIn();
+                case SC_SetStdOut:
+                    return handle_SC_SetStdOut();
 		case SC_Abs :
 		    return handle_SC_Abs();
                 /**

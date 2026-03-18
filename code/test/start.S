@@ -292,6 +292,22 @@ GetPid:
 	j	$31
 	.end GetPid
 
+	.globl SetStdIn
+	.ent	SetStdIn
+SetStdIn:
+	addiu $2,$0,SC_SetStdIn
+	syscall
+	j	$31
+	.end SetStdIn
+
+	.globl SetStdOut
+	.ent	SetStdOut
+SetStdOut:
+	addiu $2,$0,SC_SetStdOut
+	syscall
+	j	$31
+	.end SetStdOut
+
 /* dummy function to keep gcc happy */
         .globl  __main
         .ent    __main

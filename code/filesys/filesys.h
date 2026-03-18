@@ -73,10 +73,10 @@ class FileSystem {
 
     int FileTableIndex();
 
-    void Renew(int id) {
-        for (int i = 0; i < FILE_MAX; i++) {
-            fileTable[id]->Remove(i);
-        }
+    void Renew(int id) { fileTable[id]->Reset(); }
+
+    int InheritStdIO(int childId, int parentId) {
+        return fileTable[childId]->InheritStdIO(fileTable[parentId]);
     }
 
     int Open(char *name, int openMode) {
@@ -95,6 +95,20 @@ class FileSystem {
 
     int Seek(int position, int id) {
         return fileTable[FileTableIndex()]->Seek(position, id);
+    }
+
+    int SetStdIn(char *name) { return fileTable[FileTableIndex()]->SetStdIn(name); }
+
+    int SetStdOut(char *name) {
+        return fileTable[FileTableIndex()]->SetStdOut(name);
+    }
+
+    int ReadStdIn(char *buffer, int charCount) {
+        return fileTable[FileTableIndex()]->ReadStdIn(buffer, charCount);
+    }
+
+    int WriteStdOut(char *buffer, int charCount) {
+        return fileTable[FileTableIndex()]->WriteStdOut(buffer, charCount);
     }
 
     bool Remove(char *name) { return Unlink(name) == 0; }

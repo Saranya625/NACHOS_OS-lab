@@ -437,6 +437,21 @@ void ExceptionHandler(ExceptionType which) {
             DEBUG(dbgSys, "Switch to system mode\n");
             break;
         case PageFaultException:
+            kernel->stats->numPageFaults++;
+            if (kernel->currentThread->space != NULL) {
+                int badVAddr = kernel->machine->ReadRegister(BadVAddrReg);
+                unsigned int vpn = (unsigned int)badVAddr / PageSize;
+
+                cout << "[DemandPaging] Page fault at virtual address "
+                     << badVAddr << " (VPN " << vpn << ")\n";
+
+                if (kernel->currentThread->space->LoadPage(vpn)) {
+                    return;
+                }
+            }
+            cerr << "Page fault could not be handled\n";
+            SysHalt();
+            ASSERTNOTREACHED();
         case ReadOnlyException:
         case BusErrorException:
         case AddressErrorException:

@@ -9,7 +9,7 @@
 
 int main() {
     int result;
-    result = Add(-2,-7);
+    result = Add(-2,-5);
     PrintNum(result);
     return 0;
 }

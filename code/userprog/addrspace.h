@@ -15,6 +15,7 @@
 
 #include "copyright.h"
 #include "filesys.h"
+#include "noff.h"
 
 #define UserStackSize 1024  // increase this as necessary!
 
@@ -36,12 +37,18 @@ class AddrSpace {
     // to physical address _paddr_. _mode_
     // is 0 for Read, 1 for Write.
     ExceptionType Translate(unsigned int vaddr, unsigned int *paddr, int mode);
+    bool LoadPage(unsigned int vpn);
     // void InitRegisters();
    private:
     TranslationEntry *pageTable;  // Assume linear page table translation
                                   // for now!
     unsigned int numPages;        // Number of pages in the virtual
                                   // address space
+    OpenFile *executable;         // Backing executable for demand paging
+    NoffHeader noffH;             // Cached NOFF header for page-in
+
+    void LoadSegmentPage(const Segment &segment, unsigned int vpn,
+                         char *pageFrame);
 
     void InitRegisters();  // Initialize user-level CPU registers,
                            // before jumping to user code

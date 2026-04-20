@@ -19,7 +19,6 @@
 #include "main.h"
 #include "addrspace.h"
 #include "machine.h"
-#include "noff.h"
 #include "synch.h"
 
 //----------------------------------------------------------------------
@@ -64,6 +63,11 @@ static void SwapHeader(NoffHeader *noffH) {
 //----------------------------------------------------------------------
 
 AddrSpace::AddrSpace() {
+    pageTable = NULL;
+    numPages = 0;
+    executable = NULL;
+    bzero((char *)&noffH, sizeof(noffH));
+
     // pageTable = new TranslationEntry[NumPhysPages];
     // for (int i = 0; i < NumPhysPages; i++) {
     //     pageTable[i].virtualPage = i;  // for now, virt page # = phys page #
@@ -86,9 +90,12 @@ AddrSpace::AddrSpace() {
 AddrSpace::~AddrSpace() {
     int i;
     for (i = 0; i < numPages; i++) {
-        kernel->gPhysPageBitMap->Clear(pageTable[i].physicalPage);
+        if (pageTable[i].valid && pageTable[i].physicalPage >= 0) {
+            kernel->gPhysPageBitMap->Clear(pageTable[i].physicalPage);
+        }
     }
     delete[] pageTable;
+    delete executable;
 }
 
 //----------------------------------------------------------------------
@@ -102,14 +109,13 @@ AddrSpace::~AddrSpace() {
 //----------------------------------------------------------------------
 
 AddrSpace::AddrSpace(char *fileName) {
-    OpenFile *executable = kernel->fileSystem->Open(fileName);
-    NoffHeader noffH;
-    unsigned int i, size, j, offset;
-    unsigned int numCodePage,
-        numDataPage;  // số trang cho phần code và phần initData
-    int lastCodePageSize, lastDataPageSize, firstDataPageSize,
-        tempDataSize;  // kích thước ghi vào trang cuối Code, initData, và trang
-                       // đầu của initData
+    executable = NULL;
+    pageTable = NULL;
+    numPages = 0;
+    bzero((char *)&noffH, sizeof(noffH));
+
+    executable = kernel->fileSystem->Open(fileName);
+    unsigned int i, size;
 
     if (executable == NULL) {
         DEBUG(dbgFile, "\n Error opening file.");
@@ -136,52 +142,108 @@ AddrSpace::AddrSpace(char *fileName) {
 
     // Check the available memory enough to load new process
     // debug
-    if (numPages > kernel->gPhysPageBitMap->NumClear()) {
-        DEBUG(dbgAddr, "Not enough free space");
-        numPages = 0;
-        delete executable;
-        kernel->addrLock->V();
-        return;
-    }
     DEBUG(dbgAddr, "Initializing address space: " << numPages << ", " << size);
-    // first, set up the translation
+    cout << "[DemandPaging] Created address space for " << fileName << " with "
+         << numPages << " virtual pages. All pages start invalid.\n";
     pageTable = new TranslationEntry[numPages];
     for (i = 0; i < numPages; i++) {
         pageTable[i].virtualPage = i;  // for now, virtual page # = phys page #
-        pageTable[i].physicalPage = kernel->gPhysPageBitMap->FindAndSet();
-        // cerr << pageTable[i].physicalPage << endl;
-        pageTable[i].valid = TRUE;
+        pageTable[i].physicalPage = -1;
+        pageTable[i].valid = FALSE;
         pageTable[i].use = FALSE;
         pageTable[i].dirty = FALSE;
-        pageTable[i].readOnly = FALSE;  // if the code segment was entirely on
-        // a separate page, we could set its
-        // pages to be read-only
-        // xóa các trang này trên memory
-        bzero(&(kernel->machine
-                    ->mainMemory[pageTable[i].physicalPage * PageSize]),
-              PageSize);
-        DEBUG(dbgAddr, "phyPage " << pageTable[i].physicalPage);
-    }
-
-    if (noffH.code.size > 0) {
-        for (i = 0; i < numPages; i++)
-            executable->ReadAt(
-                &(kernel->machine->mainMemory[noffH.code.virtualAddr]) +
-                    (pageTable[i].physicalPage * PageSize),
-                PageSize, noffH.code.inFileAddr + (i * PageSize));
-    }
-
-    if (noffH.initData.size > 0) {
-        for (i = 0; i < numPages; i++)
-            executable->ReadAt(
-                &(kernel->machine->mainMemory[noffH.initData.virtualAddr]) +
-                    (pageTable[i].physicalPage * PageSize),
-                PageSize, noffH.initData.inFileAddr + (i * PageSize));
+        pageTable[i].readOnly = FALSE;
     }
 
     kernel->addrLock->V();
-    delete executable;
     return;
+}
+
+void AddrSpace::LoadSegmentPage(const Segment &segment, unsigned int vpn,
+                                char *pageFrame) {
+    unsigned int pageStart;
+    unsigned int pageEnd;
+    unsigned int segmentStart;
+    unsigned int segmentEnd;
+    unsigned int copyStart;
+    unsigned int copyEnd;
+    int bytesToRead;
+    int fileOffset;
+    int pageOffset;
+
+    if (segment.size <= 0 || executable == NULL) {
+        return;
+    }
+
+    pageStart = vpn * PageSize;
+    pageEnd = pageStart + PageSize;
+    segmentStart = segment.virtualAddr;
+    segmentEnd = segment.virtualAddr + segment.size;
+
+    if (pageEnd <= segmentStart || pageStart >= segmentEnd) {
+        return;
+    }
+
+    copyStart = (pageStart > segmentStart) ? pageStart : segmentStart;
+    copyEnd = (pageEnd < segmentEnd) ? pageEnd : segmentEnd;
+    bytesToRead = copyEnd - copyStart;
+    pageOffset = copyStart - pageStart;
+    fileOffset = segment.inFileAddr + (copyStart - segmentStart);
+
+    executable->ReadAt(pageFrame + pageOffset, bytesToRead, fileOffset);
+}
+
+bool AddrSpace::LoadPage(unsigned int vpn) {
+    TranslationEntry *pte;
+    int physicalPage;
+    char *pageFrame;
+
+    if (vpn >= numPages || pageTable == NULL) {
+        return FALSE;
+    }
+
+    kernel->addrLock->P();
+
+    pte = &pageTable[vpn];
+    if (pte->valid) {
+        kernel->addrLock->V();
+        return TRUE;
+    }
+
+    physicalPage = kernel->gPhysPageBitMap->FindAndSet();
+    if (physicalPage < 0) {
+        DEBUG(dbgAddr, "Demand paging failed: no free physical page");
+        kernel->addrLock->V();
+        return FALSE;
+    }
+
+    pte->physicalPage = physicalPage;
+    pte->use = FALSE;
+    pte->dirty = FALSE;
+    pte->readOnly = FALSE;
+
+    pageFrame = &(kernel->machine->mainMemory[physicalPage * PageSize]);
+    bzero(pageFrame, PageSize);
+
+    cout << "[DemandPaging] Loading VPN " << vpn << " into physical page "
+         << physicalPage << " (virtual bytes " << vpn * PageSize << "-"
+         << (vpn + 1) * PageSize - 1 << ")\n";
+
+    LoadSegmentPage(noffH.code, vpn, pageFrame);
+#ifdef RDATA
+    LoadSegmentPage(noffH.readonlyData, vpn, pageFrame);
+#endif
+    LoadSegmentPage(noffH.initData, vpn, pageFrame);
+
+    pte->valid = TRUE;
+
+    DEBUG(dbgAddr, "Demand-paged virtual page " << vpn
+                                                << " into physical page "
+                                                << physicalPage);
+    cout << "[DemandPaging] VPN " << vpn << " is now valid.\n";
+
+    kernel->addrLock->V();
+    return TRUE;
 }
 
 //----------------------------------------------------------------------

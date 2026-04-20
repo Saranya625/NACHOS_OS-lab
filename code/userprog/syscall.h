@@ -53,6 +53,7 @@
 #define SC_Sleep 56
 #define SC_SetStdIn 57
 #define SC_SetStdOut 58
+#define SC_Malloc 59
 #ifndef IN_ASM
 
 /* The system call interface.  These are the operations the Nachos
@@ -194,6 +195,11 @@ int Signal(char *name);
  */
 int SetStdIn(char *filePath);
 int SetStdOut(char *filePath);
+
+/* Allocate memory from the process heap.
+ * Returns 0 on failure.
+ */
+void *malloc(unsigned int size);
 
 /* User-level thread operations: Fork and Yield.  To allow multiple
  * threads to run within a user program.

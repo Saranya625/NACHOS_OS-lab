@@ -54,6 +54,11 @@ static void SwapHeader(NoffHeader *noffH) {
 #endif
 }
 
+static unsigned int AlignToWord(unsigned int value) {
+    const unsigned int alignment = sizeof(int);
+    return (value + alignment - 1) & ~(alignment - 1);
+}
+
 //----------------------------------------------------------------------
 // AddrSpace::AddrSpace
 // 	Create an address space to run a user program.
@@ -66,6 +71,9 @@ AddrSpace::AddrSpace() {
     pageTable = NULL;
     numPages = 0;
     executable = NULL;
+    heapBase = 0;
+    heapLimit = 0;
+    brk = 0;
     bzero((char *)&noffH, sizeof(noffH));
 
     // pageTable = new TranslationEntry[NumPhysPages];
@@ -112,10 +120,13 @@ AddrSpace::AddrSpace(char *fileName) {
     executable = NULL;
     pageTable = NULL;
     numPages = 0;
+    heapBase = 0;
+    heapLimit = 0;
+    brk = 0;
     bzero((char *)&noffH, sizeof(noffH));
 
     executable = kernel->fileSystem->Open(fileName);
-    unsigned int i, size;
+    unsigned int i, size, loadedSize;
 
     if (executable == NULL) {
         DEBUG(dbgFile, "\n Error opening file.");
@@ -128,10 +139,17 @@ AddrSpace::AddrSpace(char *fileName) {
         SwapHeader(&noffH);
     ASSERT(noffH.noffMagic == NOFFMAGIC);
     kernel->addrLock->P();
+    loadedSize = noffH.code.size;
+#ifdef RDATA
+    loadedSize += noffH.readonlyData.size;
+#endif
+    loadedSize += noffH.initData.size + noffH.uninitData.size;
+    heapBase = AlignToWord(loadedSize);
+    heapLimit = heapBase + UserHeapSize;
+    brk = heapBase;
+
     // how big is address space?
-    size = noffH.code.size + noffH.initData.size + noffH.uninitData.size +
-           UserStackSize;  // we need to increase the size
-                           // to leave room for the stack
+    size = heapLimit + UserStackSize;  // reserve heap before stack
     numPages = divRoundUp(size, PageSize);
     size = numPages * PageSize;
 
@@ -145,6 +163,8 @@ AddrSpace::AddrSpace(char *fileName) {
     DEBUG(dbgAddr, "Initializing address space: " << numPages << ", " << size);
     cout << "[DemandPaging] Created address space for " << fileName << " with "
          << numPages << " virtual pages. All pages start invalid.\n";
+    cout << "[Heap] Reserved heap region: [" << heapBase << ", "
+         << heapLimit - 1 << "], initial brk = " << brk << "\n";
     pageTable = new TranslationEntry[numPages];
     for (i = 0; i < numPages; i++) {
         pageTable[i].virtualPage = i;  // for now, virtual page # = phys page #
@@ -244,6 +264,41 @@ bool AddrSpace::LoadPage(unsigned int vpn) {
 
     kernel->addrLock->V();
     return TRUE;
+}
+
+int AddrSpace::Malloc(int size) {
+    unsigned int allocStart;
+    unsigned int allocEnd;
+
+    if (size <= 0) {
+        return 0;
+    }
+
+    kernel->addrLock->P();
+
+    allocStart = AlignToWord(brk);
+    if ((unsigned int)size > heapLimit - allocStart) {
+        cout << "[Heap] malloc(" << size << ") failed. brk = " << brk
+             << ", heap limit = " << heapLimit << "\n";
+        kernel->addrLock->V();
+        return 0;
+    }
+    allocEnd = AlignToWord(allocStart + size);
+
+    if (allocEnd > heapLimit || allocEnd < allocStart) {
+        cout << "[Heap] malloc(" << size << ") failed. brk = " << brk
+             << ", heap limit = " << heapLimit << "\n";
+        kernel->addrLock->V();
+        return 0;
+    }
+
+    brk = allocEnd;
+
+    cout << "[Heap] malloc(" << size << ") -> " << allocStart
+         << ", new brk = " << brk << "\n";
+
+    kernel->addrLock->V();
+    return allocStart;
 }
 
 //----------------------------------------------------------------------

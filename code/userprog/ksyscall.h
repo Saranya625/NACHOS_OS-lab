@@ -287,4 +287,9 @@ int SysSetStdOut(char* fileName) {
     return kernel->fileSystem->SetStdOut(fileName);
 }
 
+int SysMalloc(int size) {
+    if (kernel->currentThread->space == NULL) return 0;
+    return kernel->currentThread->space->Malloc(size);
+}
+
 #endif /* ! __USERPROG_KSYSCALL_H__ */

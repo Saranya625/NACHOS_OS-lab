@@ -426,6 +426,12 @@ void handle_SC_SetStdOut() {
     return move_program_counter();
 }
 
+void handle_SC_Malloc() {
+    int size = kernel->machine->ReadRegister(4);
+    kernel->machine->WriteRegister(2, SysMalloc(size));
+    return move_program_counter();
+}
+
 void ExceptionHandler(ExceptionType which) {
     int type = kernel->machine->ReadRegister(2);
 
@@ -512,6 +518,8 @@ void ExceptionHandler(ExceptionType which) {
                     return handle_SC_SetStdIn();
                 case SC_SetStdOut:
                     return handle_SC_SetStdOut();
+                case SC_Malloc:
+                    return handle_SC_Malloc();
 		case SC_Abs :
 		    return handle_SC_Abs();
                 /**

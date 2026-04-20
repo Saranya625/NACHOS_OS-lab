@@ -18,6 +18,7 @@
 #include "noff.h"
 
 #define UserStackSize 1024  // increase this as necessary!
+#define UserHeapSize 2048   // reserved heap space for malloc
 
 class AddrSpace {
    public:
@@ -38,6 +39,7 @@ class AddrSpace {
     // is 0 for Read, 1 for Write.
     ExceptionType Translate(unsigned int vaddr, unsigned int *paddr, int mode);
     bool LoadPage(unsigned int vpn);
+    int Malloc(int size);
     // void InitRegisters();
    private:
     TranslationEntry *pageTable;  // Assume linear page table translation
@@ -46,6 +48,9 @@ class AddrSpace {
                                   // address space
     OpenFile *executable;         // Backing executable for demand paging
     NoffHeader noffH;             // Cached NOFF header for page-in
+    unsigned int heapBase;        // Start of reserved heap region
+    unsigned int heapLimit;       // End of reserved heap region
+    unsigned int brk;             // Next free byte in heap
 
     void LoadSegmentPage(const Segment &segment, unsigned int vpn,
                          char *pageFrame);

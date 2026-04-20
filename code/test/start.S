@@ -308,6 +308,14 @@ SetStdOut:
 	j	$31
 	.end SetStdOut
 
+	.globl malloc
+	.ent	malloc
+malloc:
+	addiu $2,$0,SC_Malloc
+	syscall
+	j	$31
+	.end malloc
+
 /* dummy function to keep gcc happy */
         .globl  __main
         .ent    __main

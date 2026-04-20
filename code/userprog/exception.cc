@@ -25,6 +25,77 @@
 #include "main.h"
 #include "syscall.h"
 #include "ksyscall.h"
+
+#ifdef USE_TLB
+static int nextTLBSlot = 0;
+
+static void SaveTLBEntryBack(AddrSpace *space, TranslationEntry &tlbEntry) {
+    TranslationEntry *pte;
+
+    if (space == NULL || !tlbEntry.valid) {
+        return;
+    }
+
+    pte = space->FindPTE(tlbEntry.virtualPage);
+    if (pte != NULL) {
+        pte->use = pte->use || tlbEntry.use;
+        pte->dirty = pte->dirty || tlbEntry.dirty;
+    }
+}
+
+static int SelectTLBSlot() {
+    for (int i = 0; i < TLBSize; i++) {
+        if (!kernel->machine->tlb[i].valid) {
+            return i;
+        }
+    }
+
+    int slot = nextTLBSlot;
+    nextTLBSlot = (nextTLBSlot + 1) % TLBSize;
+    return slot;
+}
+
+static bool HandleTLBMiss(int badVAddr) {
+    AddrSpace *space = kernel->currentThread->space;
+    unsigned int vpn;
+    TranslationEntry *pte;
+    int slot;
+
+    if (space == NULL || badVAddr < 0) {
+        return FALSE;
+    }
+
+    vpn = (unsigned int)badVAddr / PageSize;
+    pte = space->FindPTE((int)vpn);
+    if (pte == NULL) {
+        return FALSE;
+    }
+
+    if (!pte->valid) {
+        if (!space->LoadPage(vpn)) {
+            return FALSE;
+        }
+        kernel->stats->numPageFaults++;
+        pte = space->FindPTE((int)vpn);
+        if (pte == NULL || !pte->valid) {
+            return FALSE;
+        }
+    }
+
+    kernel->stats->numTLBMisses++;
+    slot = SelectTLBSlot();
+    if (kernel->machine->tlb[slot].valid) {
+        SaveTLBEntryBack(space, kernel->machine->tlb[slot]);
+        kernel->stats->numTLBReplacements++;
+    }
+
+    kernel->machine->tlb[slot] = *pte;
+    kernel->machine->tlb[slot].use = FALSE;
+    kernel->machine->tlb[slot].dirty = FALSE;
+
+    return TRUE;
+}
+#endif
 //----------------------------------------------------------------------
 // ExceptionHandler
 // 	Entry point into the Nachos kernel.  Called when a user program
@@ -57,6 +128,16 @@
  * blank to convert all characters of user string
  * @return char*
  */
+static void ReadMemUntilSuccess(int addr, int size, int* value) {
+    while (!kernel->machine->ReadMem(addr, size, value)) {
+    }
+}
+
+static void WriteMemUntilSuccess(int addr, int size, int value) {
+    while (!kernel->machine->WriteMem(addr, size, value)) {
+    }
+}
+
 char* stringUser2System(int addr, int convert_length = -1) {
     int length = 0;
     bool stop = false;
@@ -64,7 +145,7 @@ char* stringUser2System(int addr, int convert_length = -1) {
 
     do {
         int oneChar;
-        kernel->machine->ReadMem(addr + length, 1, &oneChar);
+        ReadMemUntilSuccess(addr + length, 1, &oneChar);
         length++;
         // if convert_length == -1, we use '\0' to terminate the process
         // otherwise, we use convert_length to terminate the process
@@ -75,8 +156,8 @@ char* stringUser2System(int addr, int convert_length = -1) {
     str = new char[length];
     for (int i = 0; i < length; i++) {
         int oneChar;
-        kernel->machine->ReadMem(addr + i, 1,
-                                 &oneChar);  // copy characters to kernel space
+        ReadMemUntilSuccess(addr + i, 1,
+                            &oneChar);  // copy characters to kernel space
         str[i] = (unsigned char)oneChar;
     }
     return str;
@@ -94,10 +175,10 @@ char* stringUser2System(int addr, int convert_length = -1) {
 void StringSys2User(char* str, int addr, int convert_length = -1) {
     int length = (convert_length == -1 ? strlen(str) : convert_length);
     for (int i = 0; i < length; i++) {
-        kernel->machine->WriteMem(addr + i, 1,
-                                  str[i]);  // copy characters to user space
+        WriteMemUntilSuccess(addr + i, 1,
+                             str[i]);  // copy characters to user space
     }
-    kernel->machine->WriteMem(addr + length, 1, '\0');
+    WriteMemUntilSuccess(addr + length, 1, '\0');
 }
 
 /**
@@ -443,17 +524,24 @@ void ExceptionHandler(ExceptionType which) {
             DEBUG(dbgSys, "Switch to system mode\n");
             break;
         case PageFaultException:
-            kernel->stats->numPageFaults++;
             if (kernel->currentThread->space != NULL) {
                 int badVAddr = kernel->machine->ReadRegister(BadVAddrReg);
+
+#ifdef USE_TLB
+                if (HandleTLBMiss(badVAddr)) {
+                    return;
+                }
+#else
                 unsigned int vpn = (unsigned int)badVAddr / PageSize;
 
                 cout << "[DemandPaging] Page fault at virtual address "
                      << badVAddr << " (VPN " << vpn << ")\n";
 
                 if (kernel->currentThread->space->LoadPage(vpn)) {
+                    kernel->stats->numPageFaults++;
                     return;
                 }
+#endif
             }
             cerr << "Page fault could not be handled\n";
             SysHalt();

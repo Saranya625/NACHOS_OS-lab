@@ -59,6 +59,23 @@ static unsigned int AlignToWord(unsigned int value) {
     return (value + alignment - 1) & ~(alignment - 1);
 }
 
+#ifdef USE_TLB
+static void SaveTLBEntryToPageTable(AddrSpace *space,
+                                    TranslationEntry &tlbEntry) {
+    TranslationEntry *pte;
+
+    if (space == NULL || !tlbEntry.valid) {
+        return;
+    }
+
+    pte = space->FindPTE(tlbEntry.virtualPage);
+    if (pte != NULL) {
+        pte->use = pte->use || tlbEntry.use;
+        pte->dirty = pte->dirty || tlbEntry.dirty;
+    }
+}
+#endif
+
 //----------------------------------------------------------------------
 // AddrSpace::AddrSpace
 // 	Create an address space to run a user program.
@@ -364,7 +381,11 @@ void AddrSpace::InitRegisters() {
 //	For now, don't need to save anything!
 //----------------------------------------------------------------------
 
-void AddrSpace::SaveState() {}
+void AddrSpace::SaveState() {
+#ifdef USE_TLB
+    SaveTLBState();
+#endif
+}
 
 //----------------------------------------------------------------------
 // AddrSpace::RestoreState
@@ -375,8 +396,41 @@ void AddrSpace::SaveState() {}
 //----------------------------------------------------------------------
 
 void AddrSpace::RestoreState() {
+#ifdef USE_TLB
+    kernel->machine->pageTable = NULL;
+    kernel->machine->pageTableSize = 0;
+    ClearTLB();
+#else
     kernel->machine->pageTable = pageTable;
     kernel->machine->pageTableSize = numPages;
+#endif
+}
+
+TranslationEntry *AddrSpace::FindPTE(int vpn) {
+    if (vpn < 0 || (unsigned int)vpn >= numPages || pageTable == NULL) {
+        return NULL;
+    }
+    return &pageTable[vpn];
+}
+
+void AddrSpace::SaveTLBState() {
+#ifdef USE_TLB
+    Machine *machine = kernel->machine;
+
+    for (int i = 0; i < TLBSize; i++) {
+        SaveTLBEntryToPageTable(this, machine->tlb[i]);
+    }
+#endif
+}
+
+void AddrSpace::ClearTLB() {
+#ifdef USE_TLB
+    for (int i = 0; i < TLBSize; i++) {
+        kernel->machine->tlb[i].valid = FALSE;
+        kernel->machine->tlb[i].use = FALSE;
+        kernel->machine->tlb[i].dirty = FALSE;
+    }
+#endif
 }
 
 //----------------------------------------------------------------------

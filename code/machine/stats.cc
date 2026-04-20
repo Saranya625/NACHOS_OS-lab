@@ -20,7 +20,8 @@ Statistics::Statistics() {
     totalTicks = idleTicks = systemTicks = userTicks = 0;
     numDiskReads = numDiskWrites = 0;
     numConsoleCharsRead = numConsoleCharsWritten = 0;
-    numPageFaults = numPacketsSent = numPacketsRecvd = 0;
+    numPageFaults = numTLBMisses = numTLBReplacements = 0;
+    numPacketsSent = numPacketsRecvd = 0;
 }
 
 //----------------------------------------------------------------------
@@ -37,6 +38,8 @@ void Statistics::Print() {
     cout << "Console I/O: reads " << numConsoleCharsRead;
     cout << ", writes " << numConsoleCharsWritten << "\n";
     cout << "Paging: faults " << numPageFaults << "\n";
+    cout << "TLB: misses " << numTLBMisses;
+    cout << ", replacements " << numTLBReplacements << "\n";
     cout << "Network I/O: packets received " << numPacketsRecvd;
     cout << ", sent " << numPacketsSent << "\n";
 }

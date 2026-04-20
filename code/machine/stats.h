@@ -33,6 +33,8 @@ class Statistics {
     int numConsoleCharsRead;     // number of characters read from the keyboard
     int numConsoleCharsWritten;  // number of characters written to the display
     int numPageFaults;           // number of virtual memory page faults
+    int numTLBMisses;            // number of TLB misses handled in software
+    int numTLBReplacements;      // number of valid TLB entries evicted
     int numPacketsSent;          // number of packets sent over the network
     int numPacketsRecvd;         // number of packets received over the network
 

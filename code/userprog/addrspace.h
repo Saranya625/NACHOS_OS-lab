@@ -38,6 +38,11 @@ class AddrSpace {
     // to physical address _paddr_. _mode_
     // is 0 for Read, 1 for Write.
     ExceptionType Translate(unsigned int vaddr, unsigned int *paddr, int mode);
+    int NumPages() const { return (int)numPages; }
+    TranslationEntry *GetPageTable() { return pageTable; }
+    TranslationEntry *FindPTE(int vpn);
+    void SaveTLBState();
+    void ClearTLB();
     bool LoadPage(unsigned int vpn);
     int Malloc(int size);
     // void InitRegisters();
